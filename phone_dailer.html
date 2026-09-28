@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OpenPhone Clone</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Socket.IO CDN -->
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-color: #1e293b;
+            --panel-hover: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #6366f1;
+            --accent-hover: #4f46e5;
+            --danger-color: #ef4444;
+            --success-color: #22c55e;
+            --ring-color: rgba(99, 102, 241, 0.5);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- LOGIN SCREEN --- */
+        #login-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            padding: 20px;
+            text-align: center;
+            animation: fadeIn 0.5s ease;
+        }
+
+        #login-screen h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        #login-screen p {
+            color: var(--text-muted);
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            width: 100%;
+            max-width: 320px;
+            margin-bottom: 20px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            background-color: var(--panel-color);
+            color: var(--text-main);
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .input-group input:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px var(--ring-color);
+        }
+
+        .btn-primary {
+            width: 100%;
+            max-width: 320px;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent-color), #8b5cf6);
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+
+        /* --- MAIN APP SCREEN --- */
+        #app-screen {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            animation: fadeIn 0.5s ease;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background-color: var(--panel-color);
+            border-bottom: 1px solid #334155;
+        }
+
+        header h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: var(--success-color);
+            background: rgba(34, 197, 94, 0.1);
+            padding: 6px 12px;
+            border-radius: 20px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success-color);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--success-color);
+        }
+
+        .user-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .user-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--panel-color);
+            padding: 16px;
+            border-radius: 16px;
+            transition: background-color 0.2s;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+
+        .user-card:hover {
+            background-color: var(--panel-hover);
+            border-color: #475569;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: white;
+            text-transform: uppercase;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .call-icon {
+            background-color: rgba(99, 102, 241, 0.2);
+            color: var(--accent-color);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+        }
+
+        /* --- CALL OVERLAY --- */
+        #call-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 60px 20px;
+            animation: slideUp 0.4s ease;
+        }
+
+        .call-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .call-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 20px;
+            box-shadow: 0 0 40px rgba(99, 102, 241, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        .call-name {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .call-status {
+            font-size: 1rem;
+            color: var(--text-muted);
+        }
+
+        .call-actions {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .call-btn {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.8rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            color: white;
+        }
+
+        .call-btn:active {
+            transform: scale(0.9);
+        }
+
+        .btn-answer {
+            background-color: var(--success-color);
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+        }
+
+        .btn-hangup {
+            background-color: var(--danger-color);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6); }
+            70% { box-shadow: 0 0 0 30px rgba(99, 102, 241, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+        }
+
+        /* Hide audio elements */
+        audio { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen">
+        <h1>OpenPhone</h1>
+        <p>Connect instantly with your team</p>
+        <div class="input-group">
+            <input type="text" id="username-input" placeholder="Enter your name" autocomplete="off">
+        </div>
+        <button class="btn-primary" id="connect-btn">Connect to Server</button>
+    </div>
+
+    <!-- MAIN APP SCREEN -->
+    <div id="app-screen">
+        <header>
+            <h2 id="my-username">User</h2>
+            <div class="status-badge">
+                <div class="status-dot"></div>
+                <span>Online</span>
+            </div>
+        </header>
+        <div class="user-list" id="user-list">
+            <!-- Users will be injected here -->
+            <p style="color: var(--text-muted); text-align: center; margin-top: 20px;">Waiting for other users to join...</p>
+        </div>
+    </div>
+
+    <!-- CALL OVERLAY -->
+    <div id="call-overlay">
+        <div class="call-info">
+            <div class="call-avatar" id="call-avatar">?</div>
+            <div class="call-name" id="call-name">User</div>
+            <div class="call-status" id="call-status">Ringing...</div>
+        </div>
+        <div class="call-actions" id="call-actions">
+            <!-- Buttons will be injected dynamically based on state -->
+        </div>
+    </div>
+
+    <!-- Audio Elements for WebRTC -->
+    <audio id="remote-audio" autoplay></audio>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- DOM Elements ---
+        const loginScreen = document.getElementById('login-screen');
+        const appScreen = document.getElementById('app-screen');
+        const usernameInput = document.getElementById('username-input');
+        const connectBtn = document.getElementById('connect-btn');
+        const userListEl = document.getElementById('user-list');
+        const myUsernameEl = document.getElementById('my-username');
+        const callOverlay = document.getElementById('call-overlay');
+        const callAvatar = document.getElementById('call-avatar');
+        const callName = document.getElementById('call-name');
+        const callStatus = document.getElementById('call-status');
+        const callActions = document.getElementById('call-actions');
+        const remoteAudio = document.getElementById('remote-audio');
+
+        // --- State Variables ---
+        let socket;
+        let currentUser = null;
+        let peerConnection = null;
+        let currentCallId = null;
+        let targetUserId = null;
+        let isCaller = false;
+
+        const iceConfiguration = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        // --- 1. LOGIN & CONNECT ---
+        connectBtn.addEventListener('click', () => {
+            const username = usernameInput.value.trim();
+            if (!username) return alert('Please enter your name');
+
+            currentUser = username;
+            myUsernameEl.textContent = username;
+
+            // Connect to Socket.IO (automatically connects to the server that served this file)
+            socket = io();
+
+            socket.on('connect', () => {
+                console.log('🔌 Connected to server');
+                socket.emit('register', { userId: username, username: username });
+                
+                loginScreen.style.display = 'none';
+                appScreen.style.display = 'flex';
+            });
+
+            // Handle user list updates
+            socket.on('user-list', (users) => {
+                renderUserList(users);
+            });
+
+            // --- 2. CALL SIGNALING ---
+            socket.on('call-incoming', ({ callId, from }) => {
+                currentCallId = callId;
+                targetUserId = from;
+                isCaller = false;
+                showIncomingCall(from);
+            });
+
+            socket.on('call-answered', async ({ callId }) => {
+                callStatus.textContent = 'Connected';
+                callActions.innerHTML = `
+                    <button class="call-btn btn-hangup" onclick="endCall()">📴</button>
+                `;
+                // Caller creates the WebRTC offer once answered
+                if (isCaller) {
+                    await createOffer();
+                }
+            });
+
+            socket.on('call-ended', () => {
+                cleanupCall();
+            });
+
+            socket.on('call-voicemail', ({ message }) => {
+                alert(message);
+                cleanupCall();
+            });
+
+            // WebRTC Signaling Events
+            socket.on('ice-candidate', async ({ candidate }) => {
+                if (peerConnection) {
+                    try {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                    } catch (e) {
+                        console.error('Error adding ICE candidate', e);
+                    }
+                }
+            });
+
+            socket.on('offer', async ({ offer }) => {
+                if (!peerConnection) createPeerConnection();
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                socket.emit('answer', { to: targetUserId, answer });
+            });
+
+            socket.on('answer', async ({ answer }) => {
+                if (peerConnection) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+                }
+            });
+        });
+
+        // --- 3. UI RENDERING ---
+        function renderUserList(users) {
+            userListEl.innerHTML = '';
+            // Filter out ourselves
+            const otherUsers = users.filter(u => u.userId !== currentUser);
+
+            if (otherUsers.length === 0) {
+                userListEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; margin-top: 20px;">Waiting for other users to join...</p>';
+                return;
+            }
+
+            otherUsers.forEach(user => {
+                const card = document.createElement('div');
+                card.className = 'user-card';
+                card.innerHTML = `
+                    <div class="user-info">
+                        <div class="avatar">${user.username.charAt(0)}</div>
+                        <div class="user-name">${user.username}</div>
+                    </div>
+                    <div class="call-icon">📞</div>
+                `;
+                card.onclick = () => initiateCall(user.userId, user.username);
+                userListEl.appendChild(card);
+            });
+        }
+
+        // --- 4. CALL INITIATION & MANAGEMENT ---
+        function initiateCall(userId, username) {
+            targetUserId = userId;
+            isCaller = true;
+            currentCallId = 'call_' + Date.now();
+            
+            callAvatar.textContent = username.charAt(0);
+            callName.textContent = username;
+            callStatus.textContent = 'Ringing...';
+            callActions.innerHTML = `
+                <button class="call-btn btn-hangup" onclick="endCall()">📴</button>
+            `;
+            callOverlay.style.display = 'flex';
+
+            socket.emit('call-initiate', { from: currentUser, to: userId });
+        }
+
+        function showIncomingCall(from) {
+            callAvatar.textContent = from.charAt(0);
+            callName.textContent = from;
+            callStatus.textContent = 'Incoming Call...';
+            callActions.innerHTML = `
+                <button class="call-btn btn-hangup" onclick="endCall()">📴</button>
+                <button class="call-btn btn-answer" onclick="answerCall()">📞</button>
+            `;
+            callOverlay.style.display = 'flex';
+        }
+
+        function answerCall() {
+            callStatus.textContent = 'Connected';
+            callActions.innerHTML = `
+                <button class="call-btn btn-hangup" onclick="endCall()">📴</button>
+            `;
+            
+            // Initialize WebRTC and send answer
+            createPeerConnection();
+            socket.emit('call-answer', { callId: currentCallId });
+            // Note: The caller will now send an offer, which we handle in socket.on('offer')
+        }
+
+        function endCall() {
+            if (currentCallId) {
+                socket.emit('call-end', { callId: currentCallId });
+            }
+            cleanupCall();
+        }
+
+        function cleanupCall() {
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            currentCallId = null;
+            targetUserId = null;
+            callOverlay.style.display = 'none';
+            remoteAudio.srcObject = null;
+        }
+
+        // --- 5. WEBRTC PEER CONNECTION ---
+        function createPeerConnection() {
+            peerConnection = new RTCPeerConnection(iceConfiguration);
+
+            // Collect ICE candidates
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('ice-candidate', { to: targetUserId, candidate: event.candidate });
+                }
+            };
+
+            // Play remote audio
+            peerConnection.ontrack = (event) => {
+                remoteAudio.srcObject = event.streams[0];
+            };
+
+            // Add local audio track
+            navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+                .then((stream) => {
+                    stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+                })
+                .catch((err) => {
+                    console.error('Error accessing microphone', err);
+                    alert('Please allow microphone access to make calls.');
+                });
+        }
+
+        async function createOffer() {
+            createPeerConnection();
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('offer', { to: targetUserId, offer });
+        }
+    </script>
+</body>
+</html>
