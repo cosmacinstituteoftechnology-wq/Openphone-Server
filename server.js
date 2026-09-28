@@ -1,7 +1,7 @@
 /**
  * ============================================================
- * OPENPHONE-CLONE SERVER — FULL FEATURE IMPLEMENTATION
- * Compatible with Render, Railway, and Node.js hosting
+ * OPENPHONE-CLONE SERVER — SINGLE FOLDER VERSION
+ * Serves phone_dailer.html directly from the root folder
  * ============================================================
  */
 
@@ -25,8 +25,10 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from the "public" folder
-app.use(express.static(path.join(__dirname, 'public')));
+// ── CRITICAL CHANGE: Serve the HTML file from the root folder ──
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'phone_dailer.html'));
+});
 
 // ── IN-MEMORY DATA STORES ──
 const users = new Map();
