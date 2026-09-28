@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OpenPhone Clone</title>
+    <title>OpenPhone Enterprise</title>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Socket.IO CDN -->
@@ -11,343 +11,397 @@
     
     <style>
         :root {
-            --bg-color: #0f172a;
-            --panel-color: #1e293b;
+            --bg-color: #0b1120;
+            --sidebar-bg: #0f172a;
+            --panel-bg: #1e293b;
             --panel-hover: #334155;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
-            --accent-color: #6366f1;
+            --accent: #6366f1;
             --accent-hover: #4f46e5;
-            --danger-color: #ef4444;
-            --success-color: #22c55e;
-            --ring-color: rgba(99, 102, 241, 0.5);
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --border: #334155;
+            --ring: rgba(99, 102, 241, 0.4);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Inter', sans-serif;
-            -webkit-tap-highlight-color: transparent;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg-color); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; }
 
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
+        /* --- SCROLLBAR --- */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-        /* --- LOGIN SCREEN --- */
-        #login-screen {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-            padding: 20px;
-            text-align: center;
-            animation: fadeIn 0.5s ease;
+        /* --- AUTH SCREEN --- */
+        #auth-screen {
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            width: 100%; height: 100%; padding: 20px; background: linear-gradient(135deg, #0f172a, #1e1b4b);
         }
+        .auth-card {
+            background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(10px);
+            padding: 40px; border-radius: 24px; width: 100%; max-width: 400px;
+            border: 1px solid var(--border); text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+        .auth-card h1 { font-size: 2rem; margin-bottom: 10px; background: linear-gradient(135deg, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .auth-card p { color: var(--text-muted); margin-bottom: 30px; }
+        .auth-tabs { display: flex; margin-bottom: 20px; background: var(--bg-color); border-radius: 12px; padding: 4px; }
+        .auth-tab { flex: 1; padding: 12px; border: none; background: transparent; color: var(--text-muted); border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s; }
+        .auth-tab.active { background: var(--accent); color: white; }
+        .input-group { margin-bottom: 16px; text-align: left; }
+        .input-group label { display: block; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-muted); }
+        .input-group input { width: 100%; padding: 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-color); color: var(--text-main); font-size: 1rem; outline: none; transition: border 0.3s; }
+        .input-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+        .btn-primary { width: 100%; padding: 14px; border: none; border-radius: 10px; background: var(--accent); color: white; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.3s; }
+        .btn-primary:hover { background: var(--accent-hover); }
 
-        #login-screen h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 10px;
-            background: linear-gradient(135deg, #818cf8, #c084fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        /* --- APP LAYOUT --- */
+        #app-screen { display: none; width: 100%; height: 100%; }
+        
+        /* Sidebar */
+        .sidebar {
+            width: 260px; background: var(--sidebar-bg); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0;
         }
+        .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+        .sidebar-header .logo { width: 32px; height: 32px; background: var(--accent); border-radius: 8px; display: flex; justify-content: center; align-items: center; font-weight: 700; }
+        .sidebar-header h2 { font-size: 1.1rem; }
+        
+        .user-profile { padding: 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+        .user-profile .avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #818cf8, #c084fc); display: flex; justify-content: center; align-items: center; font-weight: 700; color: white; }
+        .user-profile .info h4 { font-size: 0.9rem; }
+        .user-profile .info p { font-size: 0.75rem; color: var(--success); display: flex; align-items: center; gap: 4px; }
+        .user-profile .info p::before { content: ''; width: 6px; height: 6px; background: var(--success); border-radius: 50%; display: inline-block; }
 
-        #login-screen p {
-            color: var(--text-muted);
-            margin-bottom: 30px;
+        .nav-menu { flex: 1; padding: 20px 10px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+        .nav-item {
+            display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+            border-radius: 10px; color: var(--text-muted); cursor: pointer; transition: all 0.2s; font-weight: 500;
         }
+        .nav-item:hover { background: var(--panel-hover); color: var(--text-main); }
+        .nav-item.active { background: rgba(99, 102, 241, 0.15); color: var(--accent); }
+        .nav-item .icon { font-size: 1.2rem; width: 24px; text-align: center; }
 
-        .input-group {
-            width: 100%;
-            max-width: 320px;
-            margin-bottom: 20px;
-        }
+        /* Main Content */
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-color); }
+        .view { display: none; padding: 30px; overflow-y: auto; height: 100%; animation: fadeIn 0.3s ease; }
+        .view.active { display: block; }
+        .view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .view-header h1 { font-size: 1.5rem; font-weight: 700; }
+        .view-header .actions { display: flex; gap: 10px; }
 
-        .input-group input {
-            width: 100%;
-            padding: 16px;
-            border-radius: 12px;
-            border: 1px solid #334155;
-            background-color: var(--panel-color);
-            color: var(--text-main);
-            font-size: 1rem;
-            outline: none;
-            transition: all 0.3s ease;
-        }
+        /* Dashboard Cards */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 30px; }
+        .stat-card { background: var(--panel-bg); padding: 20px; border-radius: 16px; border: 1px solid var(--border); }
+        .stat-card h3 { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-card .value { font-size: 2rem; font-weight: 700; }
+        .stat-card .value.accent { color: var(--accent); }
+        .stat-card .value.success { color: var(--success); }
+        .stat-card .value.warning { color: var(--warning); }
 
-        .input-group input:focus {
-            border-color: var(--accent-color);
-            box-shadow: 0 0 0 3px var(--ring-color);
+        /* Dialer */
+        .dialer-container { max-width: 400px; margin: 0 auto; text-align: center; }
+        .dialer-input { width: 100%; padding: 20px; font-size: 2rem; text-align: center; background: transparent; border: none; border-bottom: 2px solid var(--border); color: var(--text-main); margin-bottom: 30px; outline: none; }
+        .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 30px; }
+        .keypad button {
+            padding: 20px; border-radius: 50%; border: 1px solid var(--border); background: var(--panel-bg);
+            color: var(--text-main); font-size: 1.5rem; cursor: pointer; transition: all 0.2s;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; width: 70px; height: 70px; margin: 0 auto;
         }
+        .keypad button:hover { background: var(--panel-hover); border-color: var(--accent); }
+        .keypad button span { font-size: 0.6rem; color: var(--text-muted); margin-top: 2px; }
+        .call-btn-main { background: var(--success) !important; border: none !important; box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4); }
 
-        .btn-primary {
-            width: 100%;
-            max-width: 320px;
-            padding: 16px;
-            border: none;
-            border-radius: 12px;
-            background: linear-gradient(135deg, var(--accent-color), #8b5cf6);
-            color: white;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        /* Lists (Call Logs, Messages, Contacts) */
+        .list-container { display: flex; flex-direction: column; gap: 12px; }
+        .list-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--panel-bg); padding: 16px; border-radius: 12px; border: 1px solid var(--border);
+            transition: background 0.2s;
         }
+        .list-item:hover { background: var(--panel-hover); }
+        .list-item .left { display: flex; align-items: center; gap: 14px; }
+        .list-item .avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--border); display: flex; justify-content: center; align-items: center; font-weight: 600; }
+        .list-item .details h4 { font-size: 1rem; margin-bottom: 4px; }
+        .list-item .details p { font-size: 0.8rem; color: var(--text-muted); }
+        .list-item .right { display: flex; align-items: center; gap: 10px; }
+        .icon-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: rgba(99, 102, 241, 0.1); color: var(--accent); cursor: pointer; display: flex; justify-content: center; align-items: center; transition: background 0.2s; }
+        .icon-btn:hover { background: var(--accent); color: white; }
 
-        .btn-primary:active {
-            transform: scale(0.98);
-        }
-
-        /* --- MAIN APP SCREEN --- */
-        #app-screen {
-            display: none;
-            flex-direction: column;
-            height: 100%;
-            animation: fadeIn 0.5s ease;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px;
-            background-color: var(--panel-color);
-            border-bottom: 1px solid #334155;
-        }
-
-        header h2 {
-            font-size: 1.2rem;
-            font-weight: 600;
-        }
-
-        .status-badge {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.85rem;
-            color: var(--success-color);
-            background: rgba(34, 197, 94, 0.1);
-            padding: 6px 12px;
-            border-radius: 20px;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            background-color: var(--success-color);
-            border-radius: 50%;
-            box-shadow: 0 0 8px var(--success-color);
-        }
-
-        .user-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .user-card {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: var(--panel-color);
-            padding: 16px;
-            border-radius: 16px;
-            transition: background-color 0.2s;
-            cursor: pointer;
-            border: 1px solid transparent;
-        }
-
-        .user-card:hover {
-            background-color: var(--panel-hover);
-            border-color: #475569;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #818cf8, #c084fc);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: 700;
-            font-size: 1.2rem;
-            color: white;
-            text-transform: uppercase;
-        }
-
-        .user-name {
-            font-weight: 600;
-            font-size: 1rem;
-        }
-
-        .call-icon {
-            background-color: rgba(99, 102, 241, 0.2);
-            color: var(--accent-color);
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.2rem;
-        }
+        /* Settings */
+        .settings-group { background: var(--panel-bg); padding: 24px; border-radius: 16px; border: 1px solid var(--border); margin-bottom: 20px; }
+        .settings-group h3 { margin-bottom: 16px; font-size: 1.1rem; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .setting-row:last-child { border-bottom: none; }
+        .setting-row .label { font-size: 0.95rem; }
+        .setting-row .desc { font-size: 0.8rem; color: var(--text-muted); }
+        .toggle-switch { position: relative; width: 48px; height: 26px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .4s; border-radius: 26px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent); }
+        input:checked + .slider:before { transform: translateX(22px); }
 
         /* --- CALL OVERLAY --- */
         #call-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(10px);
-            z-index: 1000;
-            flex-direction: column;
-            justify-content: space-between;
-            align-items: center;
-            padding: 60px 20px;
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(11, 17, 32, 0.95); backdrop-filter: blur(15px); z-index: 1000;
+            flex-direction: column; justify-content: space-between; align-items: center; padding: 60px 20px;
             animation: slideUp 0.4s ease;
         }
-
-        .call-info {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            margin-top: 40px;
-        }
-
+        .call-info { text-align: center; margin-top: 40px; }
         .call-avatar {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #818cf8, #c084fc);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 3rem;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 20px;
-            box-shadow: 0 0 40px rgba(99, 102, 241, 0.4);
-            animation: pulse 2s infinite;
+            width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #818cf8, #c084fc);
+            display: flex; justify-content: center; align-items: center; font-size: 3rem; font-weight: 700; color: white;
+            margin: 0 auto 20px; box-shadow: 0 0 40px rgba(99, 102, 241, 0.4); animation: pulse 2s infinite;
         }
-
-        .call-name {
-            font-size: 1.8rem;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-
-        .call-status {
-            font-size: 1rem;
-            color: var(--text-muted);
-        }
-
-        .call-actions {
-            display: flex;
-            gap: 40px;
-            margin-bottom: 40px;
-        }
-
+        .call-name { font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
+        .call-status { font-size: 1rem; color: var(--text-muted); }
+        .call-actions { display: flex; gap: 30px; margin-bottom: 40px; }
         .call-btn {
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            border: none;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.8rem;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            color: white;
+            width: 72px; height: 72px; border-radius: 50%; border: none;
+            display: flex; justify-content: center; align-items: center; font-size: 1.8rem; cursor: pointer; transition: transform 0.2s; color: white;
         }
+        .call-btn:active { transform: scale(0.9); }
+        .btn-answer { background: var(--success); box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4); }
+        .btn-hangup { background: var(--danger); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); }
+        .btn-mute { background: var(--panel-bg); border: 1px solid var(--border); font-size: 1.4rem; }
+        .btn-mute.active { background: var(--warning); border-color: var(--warning); }
 
-        .call-btn:active {
-            transform: scale(0.9);
+        /* --- MOBILE RESPONSIVENESS --- */
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; bottom: 0; left: 0; width: 100%; height: 70px; flex-direction: row; padding: 0; border-right: none; border-top: 1px solid var(--border); z-index: 100; }
+            .sidebar-header, .user-profile { display: none; }
+            .nav-menu { flex-direction: row; padding: 0; justify-content: space-around; align-items: center; width: 100%; }
+            .nav-item { flex-direction: column; gap: 4px; padding: 8px; font-size: 0.7rem; border-radius: 8px; }
+            .nav-item .icon { font-size: 1.4rem; }
+            .main-content { margin-bottom: 70px; }
+            .view { padding: 20px; }
         }
-
-        .btn-answer {
-            background-color: var(--success-color);
-            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
-        }
-
-        .btn-hangup {
-            background-color: var(--danger-color);
-            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        @media (max-width: 480px) {
+            .keypad button { width: 60px; height: 60px; font-size: 1.2rem; }
         }
 
         /* --- ANIMATIONS --- */
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6); }
-            70% { box-shadow: 0 0 0 30px rgba(99, 102, 241, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
-        }
-
-        /* Hide audio elements */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6); } 70% { box-shadow: 0 0 0 30px rgba(99, 102, 241, 0); } 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); } }
         audio { display: none; }
     </style>
 </head>
 <body>
 
-    <!-- LOGIN SCREEN -->
-    <div id="login-screen">
-        <h1>OpenPhone</h1>
-        <p>Connect instantly with your team</p>
-        <div class="input-group">
-            <input type="text" id="username-input" placeholder="Enter your name" autocomplete="off">
-        </div>
-        <button class="btn-primary" id="connect-btn">Connect to Server</button>
-    </div>
-
-    <!-- MAIN APP SCREEN -->
-    <div id="app-screen">
-        <header>
-            <h2 id="my-username">User</h2>
-            <div class="status-badge">
-                <div class="status-dot"></div>
-                <span>Online</span>
+    <!-- ================= AUTH SCREEN ================= -->
+    <div id="auth-screen">
+        <div class="auth-card">
+            <h1>OpenPhone</h1>
+            <p>Enterprise Communication Platform</p>
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchAuth('login')">Login</button>
+                <button class="auth-tab" onclick="switchAuth('register')">Sign Up</button>
             </div>
-        </header>
-        <div class="user-list" id="user-list">
-            <!-- Users will be injected here -->
-            <p style="color: var(--text-muted); text-align: center; margin-top: 20px;">Waiting for other users to join...</p>
+            <div id="login-form">
+                <div class="input-group">
+                    <label>Username</label>
+                    <input type="text" id="login-username" placeholder="Enter your username">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" placeholder="Enter your password">
+                </div>
+                <button class="btn-primary" onclick="handleLogin()">Login</button>
+            </div>
+            <div id="register-form" style="display: none;">
+                <div class="input-group">
+                    <label>Full Name</label>
+                    <input type="text" id="reg-name" placeholder="Enter your full name">
+                </div>
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="reg-email" placeholder="Enter your email">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="reg-password" placeholder="Create a password">
+                </div>
+                <button class="btn-primary" onclick="handleRegister()">Create Account</button>
+            </div>
         </div>
     </div>
 
-    <!-- CALL OVERLAY -->
+    <!-- ================= APP SCREEN ================= -->
+    <div id="app-screen">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">O</div>
+                <h2>OpenPhone</h2>
+            </div>
+            <div class="user-profile">
+                <div class="avatar" id="sidebar-avatar">U</div>
+                <div class="info">
+                    <h4 id="sidebar-name">User</h4>
+                    <p>Online</p>
+                </div>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-item active" data-view="dashboard" onclick="switchView('dashboard')">
+                    <span class="icon">📊</span> Dashboard
+                </div>
+                <div class="nav-item" data-view="dialer" onclick="switchView('dialer')">
+                    <span class="icon">📞</span> Dialer
+                </div>
+                <div class="nav-item" data-view="call-logs" onclick="switchView('call-logs')">
+                    <span class="icon">📋</span> Call Logs
+                </div>
+                <div class="nav-item" data-view="messages" onclick="switchView('messages')">
+                    <span class="icon">💬</span> Messages
+                </div>
+                <div class="nav-item" data-view="contacts" onclick="switchView('contacts')">
+                    <span class="icon">👥</span> Contacts
+                </div>
+                <div class="nav-item" data-view="business" onclick="switchView('business')">
+                    <span class="icon">🏢</span> Business
+                </div>
+                <div class="nav-item" data-view="settings" onclick="switchView('settings')">
+                    <span class="icon">⚙️</span> Settings
+                </div>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            
+            <!-- DASHBOARD VIEW -->
+            <div id="view-dashboard" class="view active">
+                <div class="view-header">
+                    <h1>Dashboard</h1>
+                    <div class="actions"><button class="btn-primary" style="width: auto; padding: 8px 16px;" onclick="switchView('dialer')">+ New Call</button></div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card"><h3>Total Calls</h3><div class="value accent" id="stat-calls">0</div></div>
+                    <div class="stat-card"><h3>Messages</h3><div class="value success" id="stat-messages">0</div></div>
+                    <div class="stat-card"><h3>Missed Calls</h3><div class="value warning" id="stat-missed">0</div></div>
+                    <div class="stat-card"><h3>Online Users</h3><div class="value" id="stat-online">0</div></div>
+                </div>
+                <div class="settings-group">
+                    <h3>Recent Activity</h3>
+                    <div class="list-container" id="dashboard-recent-list">
+                        <p style="color: var(--text-muted);">No recent activity.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DIALER VIEW -->
+            <div id="view-dialer" class="view">
+                <div class="view-header"><h1>Dialer</h1></div>
+                <div class="dialer-container">
+                    <input type="text" class="dialer-input" id="dialer-input" placeholder="Enter number or extension" readonly>
+                    <div class="keypad">
+                        <button onclick="pressKey('1')">1<span></span></button>
+                        <button onclick="pressKey('2')">2<span>ABC</span></button>
+                        <button onclick="pressKey('3')">3<span>DEF</span></button>
+                        <button onclick="pressKey('4')">4<span>GHI</span></button>
+                        <button onclick="pressKey('5')">5<span>JKL</span></button>
+                        <button onclick="pressKey('6')">6<span>MNO</span></button>
+                        <button onclick="pressKey('7')">7<span>PQRS</span></button>
+                        <button onclick="pressKey('8')">8<span>TUV</span></button>
+                        <button onclick="pressKey('9')">9<span>WXYZ</span></button>
+                        <button onclick="pressKey('*')">*<span></span></button>
+                        <button onclick="pressKey('0')">0<span>+</span></button>
+                        <button onclick="pressKey('#')">#<span></span></button>
+                    </div>
+                    <div style="display: flex; justify-content: center; gap: 20px;">
+                        <button class="call-btn btn-hangup" style="width: 60px; height: 60px; font-size: 1.5rem;" onclick="clearDialer()">⌫</button>
+                        <button class="call-btn btn-answer" style="width: 60px; height: 60px; font-size: 1.5rem;" onclick="makeCall()">📞</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CALL LOGS VIEW -->
+            <div id="view-call-logs" class="view">
+                <div class="view-header"><h1>Call Logs</h1></div>
+                <div class="list-container" id="call-logs-list">
+                    <p style="color: var(--text-muted);">No call history.</p>
+                </div>
+            </div>
+
+            <!-- MESSAGES VIEW -->
+            <div id="view-messages" class="view">
+                <div class="view-header"><h1>Messages</h1></div>
+                <div class="list-container" id="messages-list">
+                    <p style="color: var(--text-muted);">No messages yet.</p>
+                </div>
+            </div>
+
+            <!-- CONTACTS VIEW -->
+            <div id="view-contacts" class="view">
+                <div class="view-header"><h1>Contacts</h1><button class="btn-primary" style="width: auto; padding: 8px 16px;">+ Add Contact</button></div>
+                <div class="list-container" id="contacts-list">
+                    <p style="color: var(--text-muted);">No contacts found.</p>
+                </div>
+            </div>
+
+            <!-- BUSINESS VIEW -->
+            <div id="view-business" class="view">
+                <div class="view-header"><h1>Business Settings</h1></div>
+                <div class="settings-group">
+                    <h3>Ring Groups</h3>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 10px;">Route incoming calls to multiple team members.</p>
+                    <div class="list-container" id="ring-groups-list">
+                        <p style="color: var(--text-muted);">No ring groups configured.</p>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h3>Virtual Numbers</h3>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 10px;">Manage your internal extensions.</p>
+                    <div class="list-container">
+                        <div class="list-item">
+                            <div class="left">
+                                <div class="avatar">📞</div>
+                                <div class="details"><h4>EXT1001 (Main Line)</h4><p>Active</p></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SETTINGS VIEW -->
+            <div id="view-settings" class="view">
+                <div class="view-header"><h1>Call Settings</h1></div>
+                <div class="settings-group">
+                    <h3>Audio & Video</h3>
+                    <div class="setting-row">
+                        <div><div class="label">Microphone</div><div class="desc">Default System Microphone</div></div>
+                        <button class="icon-btn" onclick="alert('Audio devices settings will open here.')">🎤</button>
+                    </div>
+                    <div class="setting-row">
+                        <div><div class="label">Speaker</div><div class="desc">Default System Speaker</div></div>
+                        <button class="icon-btn" onclick="alert('Speaker settings will open here.')">🔊</button>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h3>Call Preferences</h3>
+                    <div class="setting-row">
+                        <div><div class="label">Do Not Disturb</div><div class="desc">Silence all incoming calls</div></div>
+                        <label class="toggle-switch"><input type="checkbox"><span class="slider"></span></label>
+                    </div>
+                    <div class="setting-row">
+                        <div><div class="label">Call Recording</div><div class="desc">Automatically record all calls</div></div>
+                        <label class="toggle-switch"><input type="checkbox"><span class="slider"></span></label>
+                    </div>
+                    <div class="setting-row">
+                        <div><div class="label">Voicemail Transcription</div><div class="desc">Get AI-powered summaries of voicemails</div></div>
+                        <label class="toggle-switch"><input type="checkbox" checked><span class="slider"></span></label>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ================= CALL OVERLAY ================= -->
     <div id="call-overlay">
         <div class="call-info">
             <div class="call-avatar" id="call-avatar">?</div>
@@ -355,36 +409,26 @@
             <div class="call-status" id="call-status">Ringing...</div>
         </div>
         <div class="call-actions" id="call-actions">
-            <!-- Buttons will be injected dynamically based on state -->
+            <!-- Buttons injected by JS -->
         </div>
     </div>
 
     <!-- Audio Elements for WebRTC -->
     <audio id="remote-audio" autoplay></audio>
 
-    <!-- JAVASCRIPT LOGIC -->
+    <!-- ================= JAVASCRIPT LOGIC ================= -->
     <script>
-        // --- DOM Elements ---
-        const loginScreen = document.getElementById('login-screen');
-        const appScreen = document.getElementById('app-screen');
-        const usernameInput = document.getElementById('username-input');
-        const connectBtn = document.getElementById('connect-btn');
-        const userListEl = document.getElementById('user-list');
-        const myUsernameEl = document.getElementById('my-username');
-        const callOverlay = document.getElementById('call-overlay');
-        const callAvatar = document.getElementById('call-avatar');
-        const callName = document.getElementById('call-name');
-        const callStatus = document.getElementById('call-status');
-        const callActions = document.getElementById('call-actions');
-        const remoteAudio = document.getElementById('remote-audio');
-
-        // --- State Variables ---
-        let socket;
-        let currentUser = null;
+        // --- STATE ---
+        let socket = null;
+        let currentUser = { id: '', name: '' };
         let peerConnection = null;
         let currentCallId = null;
         let targetUserId = null;
         let isCaller = false;
+        let localStream = null;
+        let callLogs = [];
+        let messages = [];
+        let contacts = [];
 
         const iceConfiguration = {
             iceServers: [
@@ -393,31 +437,63 @@
             ]
         };
 
-        // --- 1. LOGIN & CONNECT ---
-        connectBtn.addEventListener('click', () => {
-            const username = usernameInput.value.trim();
-            if (!username) return alert('Please enter your name');
+        // --- DOM ELEMENTS ---
+        const authScreen = document.getElementById('auth-screen');
+        const appScreen = document.getElementById('app-screen');
+        const callOverlay = document.getElementById('call-overlay');
+        const remoteAudio = document.getElementById('remote-audio');
 
-            currentUser = username;
-            myUsernameEl.textContent = username;
+        // --- AUTHENTICATION ---
+        function switchAuth(type) {
+            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('login-form').style.display = type === 'login' ? 'block' : 'none';
+            document.getElementById('register-form').style.display = type === 'register' ? 'block' : 'none';
+        }
 
-            // Connect to Socket.IO (automatically connects to the server that served this file)
+        function handleLogin() {
+            const username = document.getElementById('login-username').value.trim();
+            if (!username) return alert('Please enter a username');
+            initApp(username);
+        }
+
+        function handleRegister() {
+            const name = document.getElementById('reg-name').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const password = document.getElementById('reg-password').value;
+            if (!name || !email || !password) return alert('Please fill all fields');
+            // In a real app, this would call /api/users/register
+            initApp(name);
+        }
+
+        // --- APP INITIALIZATION ---
+        function initApp(username) {
+            currentUser.id = username;
+            currentUser.name = username;
+            
+            // Update UI
+            document.getElementById('sidebar-name').textContent = username;
+            document.getElementById('sidebar-avatar').textContent = username.charAt(0).toUpperCase();
+            
+            authScreen.style.display = 'none';
+            appScreen.style.display = 'flex';
+
+            // Connect to Socket.IO
             socket = io();
-
+            
             socket.on('connect', () => {
-                console.log('🔌 Connected to server');
-                socket.emit('register', { userId: username, username: username });
-                
-                loginScreen.style.display = 'none';
-                appScreen.style.display = 'flex';
+                socket.emit('register', { userId: currentUser.id, username: currentUser.name });
+                console.log('Connected to server');
             });
 
-            // Handle user list updates
+            // Handle User List updates
             socket.on('user-list', (users) => {
-                renderUserList(users);
+                // Update online users count
+                document.getElementById('stat-online').textContent = users.filter(u => u.status === 'online').length;
+                renderContacts(users);
             });
 
-            // --- 2. CALL SIGNALING ---
+            // Handle Incoming Calls
             socket.on('call-incoming', ({ callId, from }) => {
                 currentCallId = callId;
                 targetUserId = from;
@@ -425,37 +501,26 @@
                 showIncomingCall(from);
             });
 
+            // Handle Call Answered
             socket.on('call-answered', async ({ callId }) => {
-                callStatus.textContent = 'Connected';
-                callActions.innerHTML = `
-                    <button class="call-btn btn-hangup" onclick="endCall()">📴</button>
-                `;
-                // Caller creates the WebRTC offer once answered
-                if (isCaller) {
-                    await createOffer();
-                }
+                updateCallStatus('Connected');
+                renderCallControls('active');
+                if (isCaller) await createOffer();
             });
 
+            // Handle Call Ended
             socket.on('call-ended', () => {
                 cleanupCall();
             });
 
-            socket.on('call-voicemail', ({ message }) => {
-                alert(message);
-                cleanupCall();
-            });
-
-            // WebRTC Signaling Events
+            // Handle ICE Candidates
             socket.on('ice-candidate', async ({ candidate }) => {
                 if (peerConnection) {
-                    try {
-                        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-                    } catch (e) {
-                        console.error('Error adding ICE candidate', e);
-                    }
+                    try { await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) {}
                 }
             });
 
+            // Handle WebRTC Offer
             socket.on('offer', async ({ offer }) => {
                 if (!peerConnection) createPeerConnection();
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
@@ -464,122 +529,138 @@
                 socket.emit('answer', { to: targetUserId, answer });
             });
 
+            // Handle WebRTC Answer
             socket.on('answer', async ({ answer }) => {
-                if (peerConnection) {
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-                }
+                if (peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
             });
-        });
 
-        // --- 3. UI RENDERING ---
-        function renderUserList(users) {
-            userListEl.innerHTML = '';
-            // Filter out ourselves
-            const otherUsers = users.filter(u => u.userId !== currentUser);
-
-            if (otherUsers.length === 0) {
-                userListEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; margin-top: 20px;">Waiting for other users to join...</p>';
-                return;
-            }
-
-            otherUsers.forEach(user => {
-                const card = document.createElement('div');
-                card.className = 'user-card';
-                card.innerHTML = `
-                    <div class="user-info">
-                        <div class="avatar">${user.username.charAt(0)}</div>
-                        <div class="user-name">${user.username}</div>
-                    </div>
-                    <div class="call-icon">📞</div>
-                `;
-                card.onclick = () => initiateCall(user.userId, user.username);
-                userListEl.appendChild(card);
+            // Handle Incoming Messages
+            socket.on('message-received', (msg) => {
+                messages.push(msg);
+                renderMessages();
+                alert(`New message from ${msg.from}: ${msg.content}`);
             });
         }
 
-        // --- 4. CALL INITIATION & MANAGEMENT ---
+        // --- VIEW NAVIGATION ---
+        function switchView(viewName) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            
+            document.getElementById(`view-${viewName}`).classList.add('active');
+            document.querySelector(`[data-view="${viewName}"]`).classList.add('active');
+        }
+
+        // --- DIALER ---
+        function pressKey(key) {
+            const input = document.getElementById('dialer-input');
+            input.value += key;
+        }
+
+        function clearDialer() {
+            const input = document.getElementById('dialer-input');
+            input.value = input.value.slice(0, -1);
+        }
+
+        function makeCall() {
+            const number = document.getElementById('dialer-input').value.trim();
+            if (!number) return alert('Please enter a number or extension');
+            initiateCall(number, number);
+        }
+
+        // --- CALL LOGIC ---
         function initiateCall(userId, username) {
             targetUserId = userId;
             isCaller = true;
             currentCallId = 'call_' + Date.now();
             
-            callAvatar.textContent = username.charAt(0);
-            callName.textContent = username;
-            callStatus.textContent = 'Ringing...';
-            callActions.innerHTML = `
-                <button class="call-btn btn-hangup" onclick="endCall()">📴</button>
-            `;
+            document.getElementById('call-avatar').textContent = username.charAt(0).toUpperCase();
+            document.getElementById('call-name').textContent = username;
+            updateCallStatus('Ringing...');
+            renderCallControls('outgoing');
             callOverlay.style.display = 'flex';
 
-            socket.emit('call-initiate', { from: currentUser, to: userId });
+            socket.emit('call-initiate', { from: currentUser.id, to: userId });
         }
 
         function showIncomingCall(from) {
-            callAvatar.textContent = from.charAt(0);
-            callName.textContent = from;
-            callStatus.textContent = 'Incoming Call...';
-            callActions.innerHTML = `
-                <button class="call-btn btn-hangup" onclick="endCall()">📴</button>
-                <button class="call-btn btn-answer" onclick="answerCall()">📞</button>
-            `;
+            document.getElementById('call-avatar').textContent = from.charAt(0).toUpperCase();
+            document.getElementById('call-name').textContent = from;
+            updateCallStatus('Incoming Call...');
+            renderCallControls('incoming');
             callOverlay.style.display = 'flex';
         }
 
         function answerCall() {
-            callStatus.textContent = 'Connected';
-            callActions.innerHTML = `
-                <button class="call-btn btn-hangup" onclick="endCall()">📴</button>
-            `;
-            
-            // Initialize WebRTC and send answer
+            updateCallStatus('Connected');
+            renderCallControls('active');
             createPeerConnection();
             socket.emit('call-answer', { callId: currentCallId });
-            // Note: The caller will now send an offer, which we handle in socket.on('offer')
         }
 
         function endCall() {
-            if (currentCallId) {
-                socket.emit('call-end', { callId: currentCallId });
-            }
+            if (currentCallId) socket.emit('call-end', { callId: currentCallId });
             cleanupCall();
         }
 
         function cleanupCall() {
-            if (peerConnection) {
-                peerConnection.close();
-                peerConnection = null;
-            }
+            if (peerConnection) { peerConnection.close(); peerConnection = null; }
+            if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
             currentCallId = null;
             targetUserId = null;
             callOverlay.style.display = 'none';
             remoteAudio.srcObject = null;
         }
 
-        // --- 5. WEBRTC PEER CONNECTION ---
+        function updateCallStatus(status) {
+            document.getElementById('call-status').textContent = status;
+        }
+
+        function renderCallControls(state) {
+            const container = document.getElementById('call-actions');
+            if (state === 'incoming') {
+                container.innerHTML = `
+                    <button class="call-btn btn-hangup" onclick="endCall()">📴</button>
+                    <button class="call-btn btn-answer" onclick="answerCall()">📞</button>
+                `;
+            } else if (state === 'outgoing') {
+                container.innerHTML = `<button class="call-btn btn-hangup" onclick="endCall()">📴</button>`;
+            } else if (state === 'active') {
+                container.innerHTML = `
+                    <button class="call-btn btn-mute" id="mute-btn" onclick="toggleMute()">🎤</button>
+                    <button class="call-btn btn-hangup" onclick="endCall()">📴</button>
+                `;
+            }
+        }
+
+        function toggleMute() {
+            if (localStream) {
+                const audioTrack = localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    audioTrack.enabled = !audioTrack.enabled;
+                    document.getElementById('mute-btn').classList.toggle('active', !audioTrack.enabled);
+                }
+            }
+        }
+
+        // --- WEBRTC ---
         function createPeerConnection() {
             peerConnection = new RTCPeerConnection(iceConfiguration);
 
-            // Collect ICE candidates
             peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    socket.emit('ice-candidate', { to: targetUserId, candidate: event.candidate });
-                }
+                if (event.candidate) socket.emit('ice-candidate', { to: targetUserId, candidate: event.candidate });
             };
 
-            // Play remote audio
             peerConnection.ontrack = (event) => {
                 remoteAudio.srcObject = event.streams[0];
             };
 
-            // Add local audio track
             navigator.mediaDevices.getUserMedia({ audio: true, video: false })
                 .then((stream) => {
+                    localStream = stream;
                     stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
                 })
-                .catch((err) => {
-                    console.error('Error accessing microphone', err);
-                    alert('Please allow microphone access to make calls.');
-                });
+                .catch((err) => { alert('Microphone access required.'); });
         }
 
         async function createOffer() {
@@ -588,6 +669,74 @@
             await peerConnection.setLocalDescription(offer);
             socket.emit('offer', { to: targetUserId, offer });
         }
+
+        // --- RENDERING LISTS ---
+        function renderContacts(users) {
+            const list = document.getElementById('contacts-list');
+            if (users.length === 0) {
+                list.innerHTML = '<p style="color: var(--text-muted);">No other users online.</p>';
+                return;
+            }
+            list.innerHTML = users.filter(u => u.userId !== currentUser.id).map(user => `
+                <div class="list-item">
+                    <div class="left">
+                        <div class="avatar">${user.username.charAt(0).toUpperCase()}</div>
+                        <div class="details">
+                            <h4>${user.username}</h4>
+                            <p>${user.status}</p>
+                        </div>
+                    </div>
+                    <div class="right">
+                        <button class="icon-btn" onclick="initiateCall('${user.userId}', '${user.username}')">📞</button>
+                        <button class="icon-btn" onclick="alert('Chat feature coming soon!')">💬</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderCallLogs() {
+            const list = document.getElementById('call-logs-list');
+            if (callLogs.length === 0) {
+                list.innerHTML = '<p style="color: var(--text-muted);">No call history.</p>';
+                return;
+            }
+            list.innerHTML = callLogs.map(log => `
+                <div class="list-item">
+                    <div class="left">
+                        <div class="avatar">${log.name.charAt(0)}</div>
+                        <div class="details">
+                            <h4>${log.name}</h4>
+                            <p>${log.direction} • ${log.duration}s</p>
+                        </div>
+                    </div>
+                    <div class="right">
+                        <button class="icon-btn" onclick="initiateCall('${log.id}', '${log.name}')">📞</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderMessages() {
+            const list = document.getElementById('messages-list');
+            if (messages.length === 0) {
+                list.innerHTML = '<p style="color: var(--text-muted);">No messages yet.</p>';
+                return;
+            }
+            list.innerHTML = messages.map(msg => `
+                <div class="list-item">
+                    <div class="left">
+                        <div class="avatar">${msg.from.charAt(0)}</div>
+                        <div class="details">
+                            <h4>${msg.from}</h4>
+                            <p>${msg.content}</p>
+                        </div>
+                    </div>
+                    <div class="right">
+                        <button class="icon-btn" onclick="alert('Reply feature coming soon!')">↩️</button>
+                    </div>
+                </div>
+            `).join('');
+        }
     </script>
 </body>
-</html>
+    </html>
