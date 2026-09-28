@@ -1,10 +1,11 @@
 /**
  * ============================================================
- * OPENPHONE-CLONE SERVER — SINGLE FOLDER VERSION
- * Serves phone_dailer.html directly from the root folder
+ * OPENPHONE-CLONE SERVER — V2.0 ENTERPRISE EDITION
+ * Firebase Firestore Database | Virtual Extensions | Full Network API
  * ============================================================
  */
 
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -14,6 +15,14 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
 
+// ── FIREBASE SDK ──
+const { initializeApp } = require('firebase/app');
+const { 
+  getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc,
+  collection, addDoc, query, where, getDocs, orderBy, limit 
+} = require('firebase/firestore');
+
+// ── INITIALIZE EXPRESS & SOCKET.IO ──
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -25,80 +34,89 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ── CRITICAL CHANGE: Serve the HTML file from the root folder ──
+// Serve the HTML from root
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'phone_dailer.html'));
 });
 
-// ── IN-MEMORY DATA STORES ──
-const users = new Map();
-const phoneNumbers = new Map();
-const contacts = new Map();
-const conversations = new Map();
-const ringGroups = new Map();
+// ── FIREBASE CONFIGURATION ──
+// NOTE: In production, store these in Render Environment Variables!
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY || "AIzaSyAn_k3_o500O-tvMxHKsBXTfKuTDd0igzI",
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || "openphone-2a844.firebaseapp.com",
+  projectId: process.env.FIREBASE_PROJECT_ID || "openphone-2a844",
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "openphone-2a844.firebasestorage.app",
+  messagingSenderId: process.env.FIREBASE_MSG_SENDER_ID || "274916994647",
+  appId: process.env.FIREBASE_APP_ID || "1:274916994647:web:c7abf7feeac67ad2c9bd12",
+  measurementId: process.env.FIREBASE_MEASUREMENT_ID || "G-4V12VQGPZC"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+
+// ── IN-MEMORY CACHE (For fast real-time routing) ──
 const activeCalls = new Map();
-const callLogs = new Map();
-const webhooks = new Map();
 const socketUserMap = new Map(); // socketId -> userId
 const userSocketMap = new Map(); // userId -> socketId
 
-// ── OPENPHONE API CONFIG ──
-const OPENPHONE_API_KEY = process.env.OPENPHONE_API_KEY || 'YOUR_API_KEY';
-const OPENPHONE_BASE_URL = 'https://api.openphone.com/v1';
-const openphoneHeaders = {
-  'Authorization': OPENPHONE_API_KEY,
-  'Content-Type': 'application/json',
-  'Accept': 'application/json',
-};
-
 // ── HELPER FUNCTIONS ──
 function generateId(prefix) {
-  return `${prefix}${crypto.randomBytes(8).toString('hex')}`;
+  return `${prefix}${crypto.randomBytes(6).toString('hex')}`;
+}
+
+function generateVirtualNumber() {
+  // Generates an internal extension like "EXT4821"
+  return `EXT${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+async function saveToFirestore(collectionName, docId, data) {
+  try {
+    await setDoc(doc(db, collectionName, docId), { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+    return { success: true };
+  } catch (err) {
+    console.error(`❌ Firestore write error (${collectionName}):`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+async function getFromFirestore(collectionName, docId) {
+  try {
+    const docRef = doc(db, collectionName, docId);
+    const docSnap = await getDoc(docRef);
+    return docSnap.exists() ? docSnap.data() : null;
+  } catch (err) {
+    console.error(`❌ Firestore read error (${collectionName}):`, err.message);
+    return null;
+  }
+}
+
+async function queryFirestore(collectionName, field, operator, value) {
+  try {
+    const q = query(collection(db, collectionName), where(field, operator, value));
+    const querySnapshot = await getDocs(q);
+    const results = [];
+    querySnapshot.forEach((doc) => results.push({ id: doc.id, ...doc.data() }));
+    return results;
+  } catch (err) {
+    console.error(`❌ Firestore query error (${collectionName}):`, err.message);
+    return [];
+  }
 }
 
 async function fireWebhooks(eventType, payload) {
-  for (const [id, hook] of webhooks) {
-    if (hook.events.includes(eventType) || hook.events.includes('*')) {
-      try {
+  try {
+    const hooks = await queryFirestore('webhooks', 'status', '==', 'enabled');
+    for (const hook of hooks) {
+      if (hook.events.includes(eventType) || hook.events.includes('*')) {
         await axios.post(hook.url, {
-          id: generateId('EV'),
-          object: 'event',
-          apiVersion: 'v4',
-          createdAt: new Date().toISOString(),
-          type: eventType,
-          data: payload,
-        }, { timeout: 5000 });
-        console.log(`✅ Webhook fired: ${eventType} -> ${hook.url}`);
-      } catch (err) {
-        console.error(`❌ Webhook failed (${hook.url}):`, err.message);
+          id: generateId('EV'), object: 'event', apiVersion: 'v4',
+          createdAt: new Date().toISOString(), type: eventType, data: payload,
+        }, { timeout: 5000 }).catch(e => console.error(`Webhook failed: ${hook.url}`));
       }
     }
-  }
-}
-
-async function sendSMS(from, to, content, userId) {
-  try {
-    const response = await axios.post(
-      `${OPENPHONE_BASE_URL}/messages`,
-      { content, from, to: Array.isArray(to) ? to : [to], userId: userId || undefined },
-      { headers: openphoneHeaders }
-    );
-    console.log(`📨 SMS sent from ${from} to ${to}`);
-    return response.data;
   } catch (err) {
-    console.error('SMS send failed:', err.response?.data || err.message);
-    throw err;
+    console.error('Webhook processing error:', err.message);
   }
-}
-
-async function transcribeAudio(audioUrl) {
-  console.log(`🎙️ Transcribing: ${audioUrl}`);
-  return { transcript: '[Transcription pending — integrate STT provider]', status: 'completed' };
-}
-
-async function generateCallSummary(transcript) {
-  console.log('🤖 Generating AI summary...');
-  return { summary: ['Call summary generated by AI.'], nextSteps: ['Follow up with the contact.'] };
 }
 
 // ============================================================
@@ -106,284 +124,190 @@ async function generateCallSummary(transcript) {
 // ============================================================
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime(), version: '1.0.0', platform: 'Cloud' });
+  res.json({ status: 'ok', uptime: process.uptime(), version: '2.0.0', database: 'Firebase Connected' });
 });
 
-// ── USERS ──
-app.get('/api/users', (req, res) => {
-  res.json({ data: Array.from(users.values()) });
+// ── 1. USER MANAGEMENT ──
+app.post('/api/users/register', async (req, res) => {
+  const { username, email, password } = req.body;
+  const userId = generateId('USR');
+  const virtualNumber = generateVirtualNumber();
+  
+  const user = {
+    userId, username, email, virtualNumber,
+    role: 'member', status: 'active',
+    createdAt: new Date().toISOString()
+  };
+
+  const result = await saveToFirestore('users', userId, user);
+  if (result.success) {
+    res.status(201).json({ data: user });
+  } else {
+    res.status(500).json({ error: 'Failed to create user' });
+  }
 });
 
-app.post('/api/users', (req, res) => {
-  const { username, email, role } = req.body;
-  const userId = generateId('US');
-  const user = { userId, username, email, role: role || 'member', status: 'active', createdAt: new Date().toISOString() };
-  users.set(userId, user);
-  res.status(201).json({ data: user });
-});
-
-app.get('/api/users/:id', (req, res) => {
-  const user = users.get(req.params.id);
+app.get('/api/users/:userId', async (req, res) => {
+  const user = await getFromFirestore('users', req.params.userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({ data: user });
 });
 
-// ── PHONE NUMBERS ──
-app.get('/api/numbers', (req, res) => {
-  res.json({ data: Array.from(phoneNumbers.values()) });
+app.get('/api/users', async (req, res) => {
+  const users = await queryFirestore('users', 'status', '==', 'active');
+  res.json({ data: users });
 });
 
-app.post('/api/numbers', (req, res) => {
-  const { number, label, assignedUsers } = req.body;
-  const numberId = generateId('PN');
-  const entry = { numberId, number, label: label || 'Main Line', assignedUsers: assignedUsers || [], ivrConfig: null, createdAt: new Date().toISOString() };
-  phoneNumbers.set(numberId, entry);
-  res.status(201).json({ data: entry });
+app.put('/api/users/:userId', async (req, res) => {
+  const result = await saveToFirestore('users', req.params.userId, req.body);
+  res.json({ success: result.success });
 });
 
-app.put('/api/numbers/:id/ivr', (req, res) => {
-  const entry = phoneNumbers.get(req.params.id);
-  if (!entry) return res.status(404).json({ error: 'Number not found' });
-  entry.ivrConfig = req.body.ivrConfig;
-  res.json({ data: entry });
+// ── 2. VIRTUAL NUMBER MANAGEMENT ──
+app.post('/api/virtual-numbers/generate', async (req, res) => {
+  const { userId } = req.body;
+  const virtualNumber = generateVirtualNumber();
+  
+  const numberData = {
+    numberId: generateId('VN'),
+    virtualNumber, userId,
+    status: 'active',
+    createdAt: new Date().toISOString()
+  };
+  
+  await saveToFirestore('virtual_numbers', numberData.numberId, numberData);
+  res.status(201).json({ data: numberData });
 });
 
-// ── CONTACTS ──
-app.get('/api/contacts', (req, res) => {
-  res.json({ data: Array.from(contacts.values()) });
+app.get('/api/virtual-numbers/:userId', async (req, res) => {
+  const numbers = await queryFirestore('virtual_numbers', 'userId', '==', req.params.userId);
+  res.json({ data: numbers });
 });
 
-app.post('/api/contacts', (req, res) => {
-  const { name, numbers, emails, notes, customProps } = req.body;
+// ── 3. CONTACTS & ADDRESS BOOK ──
+app.post('/api/contacts', async (req, res) => {
   const contactId = generateId('CT');
-  const contact = { contactId, name, numbers: numbers || [], emails: emails || [], notes: notes || '', customProps: customProps || {}, createdAt: new Date().toISOString() };
-  contacts.set(contactId, contact);
+  const contact = { contactId, ...req.body, createdAt: new Date().toISOString() };
+  await saveToFirestore('contacts', contactId, contact);
   res.status(201).json({ data: contact });
 });
 
-app.put('/api/contacts/:id', (req, res) => {
-  const contact = contacts.get(req.params.id);
-  if (!contact) return res.status(404).json({ error: 'Contact not found' });
-  Object.assign(contact, req.body, { updatedAt: new Date().toISOString() });
-  res.json({ data: contact });
+app.get('/api/contacts/:userId', async (req, res) => {
+  const contacts = await queryFirestore('contacts', 'userId', '==', req.params.userId);
+  res.json({ data: contacts });
 });
 
-app.delete('/api/contacts/:id', (req, res) => {
-  if (!contacts.has(req.params.id)) return res.status(404).json({ error: 'Contact not found' });
-  contacts.delete(req.params.id);
-  res.status(204).send();
-});
-
-// ── CONVERSATIONS ──
-app.get('/api/conversations', (req, res) => {
-  res.json({ data: Array.from(conversations.values()) });
-});
-
-app.get('/api/conversations/:contactId', (req, res) => {
-  const conv = Array.from(conversations.values()).find(c => c.contactId === req.params.contactId);
-  if (!conv) return res.status(404).json({ error: 'Conversation not found' });
-  res.json({ data: conv });
-});
-
-// ── SMS / MMS ──
-app.post('/api/messages', async (req, res) => {
+// ── 4. SMS / MESSAGING (Mock Gateway) ──
+app.post('/api/messages/send', async (req, res) => {
   const { from, to, content, userId } = req.body;
-  try {
-    const result = await sendSMS(from, to, content, userId);
-    const convId = generateId('CV');
-    const contactId = to[0] || 'unknown';
-    let conv = Array.from(conversations.values()).find(c => c.contactId === contactId);
-    if (!conv) { conv = { conversationId: convId, contactId, messages: [], calls: [] }; conversations.set(convId, conv); }
-    conv.messages.push({ messageId: generateId('MS'), direction: 'outgoing', from, to, content, status: 'queued', createdAt: new Date().toISOString() });
-    await fireWebhooks('message.received', { object: { id: generateId('AC'), direction: 'outgoing', from, to, text: content, status: 'queued' } });
-    res.status(202).json({ data: result.data || result });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to send message', details: err.message });
+  const messageId = generateId('MSG');
+  
+  const message = {
+    messageId, from, to, content, userId,
+    direction: 'outgoing', status: 'sent',
+    createdAt: new Date().toISOString()
+  };
+  
+  await saveToFirestore('messages', messageId, message);
+  
+  // Real-time delivery via Socket.IO
+  const targetSocket = userSocketMap.get(to);
+  if (targetSocket) {
+    io.to(targetSocket).emit('message-received', message);
   }
+  
+  await fireWebhooks('message.sent', { object: message });
+  res.status(201).json({ data: message });
 });
 
-app.get('/api/messages', (req, res) => {
-  const allMessages = [];
-  for (const conv of conversations.values()) allMessages.push(...conv.messages);
-  res.json({ data: allMessages });
+app.get('/api/messages/:userId', async (req, res) => {
+  const messages = await queryFirestore('messages', 'userId', '==', req.params.userId);
+  res.json({ data: messages });
 });
 
-// ── CALLS ──
-app.get('/api/calls', (req, res) => {
-  res.json({ data: Array.from(activeCalls.values()) });
+// ── 5. CALL LOGS & ANALYTICS ──
+app.post('/api/calls/log', async (req, res) => {
+  const callId = generateId('CALL');
+  const callLog = { callId, ...req.body, createdAt: new Date().toISOString() };
+  await saveToFirestore('call_logs', callId, callLog);
+  res.status(201).json({ data: callLog });
 });
 
-app.get('/api/calls/logs', (req, res) => {
-  res.json({ data: Array.from(callLogs.values()) });
+app.get('/api/calls/logs/:userId', async (req, res) => {
+  const logs = await queryFirestore('call_logs', 'userId', '==', req.params.userId);
+  res.json({ data: logs });
 });
 
-app.get('/api/calls/:id', (req, res) => {
-  const call = activeCalls.get(req.params.id) || callLogs.get(req.params.id);
-  if (!call) return res.status(404).json({ error: 'Call not found' });
-  res.json({ data: call });
-});
-
-app.get('/api/calls/:id/transcript', (req, res) => {
-  const call = callLogs.get(req.params.id);
-  if (!call) return res.status(404).json({ error: 'Call not found' });
-  res.json({ data: { callId: call.callId, transcript: call.transcript || null, status: call.transcriptStatus || 'pending' } });
-});
-
-app.get('/api/calls/:id/summary', (req, res) => {
-  const call = callLogs.get(req.params.id);
-  if (!call) return res.status(404).json({ error: 'Call not found' });
-  res.json({ data: { callId: call.callId, summary: call.summary || null, nextSteps: call.nextSteps || [] } });
-});
-
-// ── VOICEMAIL ──
-app.get('/api/voicemails', (req, res) => {
-  const vms = Array.from(callLogs.values()).filter(c => c.voicemail);
-  res.json({ data: vms });
-});
-
-app.get('/api/voicemails/:id', (req, res) => {
-  const vm = callLogs.get(req.params.id);
-  if (!vm || !vm.voicemail) return res.status(404).json({ error: 'Voicemail not found' });
-  res.json({ data: vm });
-});
-
-// ── RING GROUPS ──
-app.get('/api/ring-groups', (req, res) => {
-  res.json({ data: Array.from(ringGroups.values()) });
-});
-
-app.post('/api/ring-groups', (req, res) => {
-  const { name, members, ringOrder, ringTimeout } = req.body;
-  const groupId = generateId('RG');
-  const group = { groupId, name, members: members || [], ringOrder: ringOrder || 'all_at_once', ringTimeout: ringTimeout || 30, createdAt: new Date().toISOString() };
-  ringGroups.set(groupId, group);
-  res.status(201).json({ data: group });
-});
-
-app.put('/api/ring-groups/:id', (req, res) => {
-  const group = ringGroups.get(req.params.id);
-  if (!group) return res.status(404).json({ error: 'Ring group not found' });
-  Object.assign(group, req.body, { updatedAt: new Date().toISOString() });
-  res.json({ data: group });
-});
-
-// ── WEBHOOKS ──
-app.get('/api/webhooks', (req, res) => {
-  res.json({ data: Array.from(webhooks.values()) });
-});
-
-app.post('/api/webhooks', (req, res) => {
-  const { url, events, resourceIds } = req.body;
-  const webhookId = generateId('WH');
-  const hook = { webhookId, url, events: events || ['*'], resourceIds: resourceIds || [], status: 'enabled', createdAt: new Date().toISOString() };
-  webhooks.set(webhookId, hook);
-  res.status(201).json({ data: hook });
-});
-
-app.get('/api/webhooks/:id', (req, res) => {
-  const hook = webhooks.get(req.params.id);
-  if (!hook) return res.status(404).json({ error: 'Webhook not found' });
-  res.json({ data: hook });
-});
-
-app.delete('/api/webhooks/:id', (req, res) => {
-  if (!webhooks.has(req.params.id)) return res.status(404).json({ error: 'Webhook not found' });
-  webhooks.delete(req.params.id);
-  res.status(204).send();
-});
-
-// ── ANALYTICS ──
-app.get('/api/analytics', (req, res) => {
-  const totalCalls = callLogs.size;
-  const totalMessages = Array.from(conversations.values()).reduce((sum, c) => sum + c.messages.length, 0);
+app.get('/api/analytics/:userId', async (req, res) => {
+  const callLogs = await queryFirestore('call_logs', 'userId', '==', req.params.userId);
+  const messages = await queryFirestore('messages', 'userId', '==', req.params.userId);
+  
   res.json({
     data: {
-      totalCalls,
-      totalMessages,
-      totalUsers: users.size,
-      totalNumbers: phoneNumbers.size,
-      callsByDirection: {
-        inbound: Array.from(callLogs.values()).filter(c => c.direction === 'incoming').length,
-        outbound: Array.from(callLogs.values()).filter(c => c.direction === 'outgoing').length,
-      },
+      totalCalls: callLogs.length,
+      totalMessages: messages.length,
       activeCalls: activeCalls.size,
-      timestamp: new Date().toISOString(),
-    },
+      timestamp: new Date().toISOString()
+    }
   });
 });
 
-// ── IVR HANDLING ──
-function handleIVRInput(numberId, digit) {
-  const number = phoneNumbers.get(numberId);
-  if (!number || !number.ivrConfig) return null;
-  const option = number.ivrConfig.options.find(o => o.digit === digit);
-  return option || null;
-}
+// ── 6. RING GROUPS & IVR ──
+app.post('/api/ring-groups', async (req, res) => {
+  const groupId = generateId('RG');
+  const group = { groupId, ...req.body, createdAt: new Date().toISOString() };
+  await saveToFirestore('ring_groups', groupId, group);
+  res.status(201).json({ data: group });
+});
 
-// ── VOICEMAIL HANDLING ──
-async function handleVoicemail(callId, recordingUrl) {
-  const call = activeCalls.get(callId);
-  if (!call) return;
-  call.status = 'voicemail';
-  call.recordingUrl = recordingUrl;
-  const transcription = await transcribeAudio(recordingUrl);
-  call.voicemail = { recordingUrl, transcript: transcription.transcript, transcriptStatus: transcription.status };
-  const log = { ...call, completedAt: new Date().toISOString() };
-  callLogs.set(callId, log);
-  activeCalls.delete(callId);
-  await fireWebhooks('call.recording.completed', { object: { id: callId, recordingUrl, transcript: transcription.transcript } });
-  console.log(`📩 Voicemail handled for call ${callId}`);
-}
+app.get('/api/ring-groups/:userId', async (req, res) => {
+  const groups = await queryFirestore('ring_groups', 'userId', '==', req.params.userId);
+  res.json({ data: groups });
+});
 
-async function handleCallSummary(callId) {
-  const call = callLogs.get(callId);
-  if (!call || !call.transcript) return;
-  const summary = await generateCallSummary(call.transcript);
-  call.summary = summary.summary;
-  call.nextSteps = summary.nextSteps;
-  callLogs.set(callId, call);
-  await fireWebhooks('call.summary.completed', { object: { callId, object: 'callSummary', status: 'completed', ...summary } });
-  console.log(`🤖 Summary generated for call ${callId}`);
-}
+// ── 7. WEBHOOKS ──
+app.post('/api/webhooks', async (req, res) => {
+  const webhookId = generateId('WH');
+  const hook = { webhookId, ...req.body, status: 'enabled', createdAt: new Date().toISOString() };
+  await saveToFirestore('webhooks', webhookId, hook);
+  res.status(201).json({ data: hook });
+});
 
 // ============================================================
-// SOCKET.IO — REAL-TIME SIGNALING
+// SOCKET.IO — REAL-TIME NETWORK ENGINE
 // ============================================================
 io.on('connection', (socket) => {
   console.log(`🔌 Client connected: ${socket.id}`);
 
-  socket.on('register', (userData) => {
+  // ── User Registration & Presence ──
+  socket.on('register', async (userData) => {
     const { userId, username } = userData;
     socketUserMap.set(socket.id, userId);
     userSocketMap.set(userId, socket.id);
-    if (!users.has(userId)) {
-      users.set(userId, { userId, username, status: 'online', createdAt: new Date().toISOString() });
-    } else {
-      users.get(userId).status = 'online';
-    }
-    console.log(`👤 Registered: ${username} (${userId})`);
-    io.emit('user-list', Array.from(users.values()).map(u => ({ userId: u.userId, username: u.username, status: u.status })));
+    
+    await saveToFirestore('users', userId, { userId, username, status: 'online', lastSeen: new Date().toISOString() });
+    
+    io.emit('user-list', Array.from(userSocketMap.keys()).map(id => ({
+      userId: id, username: id, status: 'online'
+    })));
   });
 
-  socket.on('call-initiate', async ({ from, to, numberId }) => {
-    const callId = generateId('AC');
-    const callerId = socketUserMap.get(socket.id);
-    const call = { callId, from: from || callerId, to, numberId, status: 'ringing', direction: 'outgoing', participants: [from || callerId, to], startedAt: new Date().toISOString(), recording: false };
+  // ── Call Signaling (WebRTC) ──
+  socket.on('call-initiate', async ({ from, to }) => {
+    const callId = generateId('CALL');
+    const call = {
+      callId, from, to, status: 'ringing',
+      direction: 'outgoing', startedAt: new Date().toISOString()
+    };
     activeCalls.set(callId, call);
-    await fireWebhooks('call.ringing', { object: { id: callId, object: 'call', status: 'ringing', direction: 'outgoing', participants: [to] } });
-
-    const group = Array.from(ringGroups.values()).find(g => g.groupId === to || g.name === to);
-    if (group) {
-      const members = group.ringOrder === 'all_at_once' ? group.members :
-                      group.ringOrder === 'single_user' ? [group.members[0]] : group.members;
-      for (const memberId of members) {
-        const memberSocket = userSocketMap.get(memberId);
-        if (memberSocket) io.to(memberSocket).emit('call-incoming', { callId, from: call.from, numberId });
-      }
+    
+    await fireWebhooks('call.ringing', { object: call });
+    
+    const targetSocket = userSocketMap.get(to);
+    if (targetSocket) {
+      io.to(targetSocket).emit('call-incoming', { callId, from });
     } else {
-      const targetSocket = userSocketMap.get(to);
-      if (targetSocket) io.to(targetSocket).emit('call-incoming', { callId, from: call.from, numberId });
-      else socket.emit('call-voicemail', { callId, message: 'User offline. Leave a voicemail.' });
+      socket.emit('call-voicemail', { callId, message: 'User offline. Leave a voicemail.' });
     }
   });
 
@@ -392,69 +316,55 @@ io.on('connection', (socket) => {
     if (!call) return;
     call.status = 'active';
     activeCalls.set(callId, call);
+    
     const callerSocket = userSocketMap.get(call.from);
     if (callerSocket) io.to(callerSocket).emit('call-answered', { callId });
-    console.log(`✅ Call ${callId} answered`);
   });
 
   socket.on('call-end', async ({ callId }) => {
     const call = activeCalls.get(callId);
     if (!call) return;
+    
     call.status = 'completed';
     call.completedAt = new Date().toISOString();
     call.duration = Math.floor((new Date(call.completedAt) - new Date(call.startedAt)) / 1000);
-    callLogs.set(callId, { ...call });
+    
+    await saveToFirestore('call_logs', callId, call);
     activeCalls.delete(callId);
-    for (const participant of call.participants) {
-      const pSocket = userSocketMap.get(participant);
-      if (pSocket) io.to(pSocket).emit('call-ended', { callId });
-    }
-    await fireWebhooks('call.completed', { object: { id: callId, object: 'call', status: 'completed', duration: call.duration } });
-    if (call.recordingUrl) {
-      const transcription = await transcribeAudio(call.recordingUrl);
-      callLogs.get(callId).transcript = transcription.transcript;
-      callLogs.get(callId).transcriptStatus = transcription.status;
-      await fireWebhooks('call.transcript.completed', { object: { callId, object: 'callTranscript', transcript: transcription.transcript, status: 'completed' } });
-      await handleCallSummary(callId);
-    }
-    console.log(`📴 Call ${callId} ended (${call.duration}s)`);
+    
+    if (userSocketMap.has(call.from)) io.to(userSocketMap.get(call.from)).emit('call-ended', { callId });
+    if (userSocketMap.has(call.to)) io.to(userSocketMap.get(call.to)).emit('call-ended', { callId });
+    
+    await fireWebhooks('call.completed', { object: call });
   });
 
-  socket.on('ivr-input', ({ numberId, digit }) => {
-    const option = handleIVRInput(numberId, digit);
-    if (option) socket.emit('ivr-result', { action: option.action, target: option.target, label: option.label });
-    else socket.emit('ivr-result', { action: 'invalid', message: 'Invalid option. Please try again.' });
-  });
-
-  socket.on('voicemail-submit', async ({ callId, recordingUrl }) => {
-    await handleVoicemail(callId, recordingUrl);
-    socket.emit('voicemail-saved', { callId, status: 'saved' });
-  });
-
-  socket.on('call-recording', async ({ callId, recordingUrl }) => {
-    const call = activeCalls.get(callId);
-    if (call) {
-      call.recording = true;
-      call.recordingUrl = recordingUrl;
-      activeCalls.set(callId, call);
-      console.log(`🎙️ Recording started for call ${callId}`);
-    }
-  });
-
+  // ── WebRTC ICE Candidate Exchange ──
   socket.on('ice-candidate', ({ to, candidate }) => {
     const targetSocket = userSocketMap.get(to);
-    if (targetSocket) io.to(targetSocket).emit('ice-candidate', { from: socketUserMap.get(socket.id), candidate });
+    if (targetSocket) {
+      io.to(targetSocket).emit('ice-candidate', { from: socketUserMap.get(socket.id), candidate });
+    }
   });
 
-  socket.on('disconnect', () => {
+  socket.on('offer', ({ to, offer }) => {
+    const targetSocket = userSocketMap.get(to);
+    if (targetSocket) io.to(targetSocket).emit('offer', { from: socketUserMap.get(socket.id), offer });
+  });
+
+  socket.on('answer', ({ to, answer }) => {
+    const targetSocket = userSocketMap.get(to);
+    if (targetSocket) io.to(targetSocket).emit('answer', { from: socketUserMap.get(socket.id), answer });
+  });
+
+  // ── Disconnect & Cleanup ──
+  socket.on('disconnect', async () => {
     const userId = socketUserMap.get(socket.id);
     if (userId) {
-      const user = users.get(userId);
-      if (user) user.status = 'offline';
+      await saveToFirestore('users', userId, { status: 'offline', lastSeen: new Date().toISOString() });
       socketUserMap.delete(socket.id);
       userSocketMap.delete(userId);
+      io.emit('user-list', Array.from(userSocketMap.keys()).map(id => ({ userId: id, username: id, status: 'online' })));
       console.log(`👋 Disconnected: ${userId}`);
-      io.emit('user-list', Array.from(users.values()).map(u => ({ userId: u.userId, username: u.username, status: u.status })));
     }
   });
 });
@@ -463,9 +373,8 @@ io.on('connection', (socket) => {
 // START SERVER
 // ============================================================
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, () => {
-  console.log(`🚀 OpenPhone-Clone server running on port ${PORT}`);
-  console.log(`📡 Socket.IO ready for real-time signaling`);
+  console.log(`🚀 OpenPhone Enterprise Server v2.0 running on port ${PORT}`);
+  console.log(`🔥 Firebase Firestore Connected`);
   console.log(`🔗 REST API available at /api`);
 });
